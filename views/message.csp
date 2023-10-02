@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+
+<%inc #include "../models/gmail_client.h" %>
+
+<%c++
+    using namespace drogon;
+    auto message = @@.get<Message>("message");
+    auto getHeaderValue = [](const std::vector<Header> &headers, const std::string& headerName) -> std::string {
+        for (auto &header: headers) {
+            if (header.name == headerName) {
+                return header.value;
+            }
+        }
+        return "";
+    };
+
+    std::string decodedBody = @@.get<std::string>("messageBody");
+%>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Email Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+
+        .subject {
+            background-color: white;
+            border-radius: 25px 25px 0 0;
+            padding: 15px 25px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            margin: 50px auto 0;  /* Adjusted margin to separate from top */
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;  /* Centering the subject text */
+        }
+
+        .email-info {
+            background-color: white;
+            border-radius: 0;
+            padding: 10px 25px 5px;
+            max-width: 700px;
+            margin: auto;
+            display: flex;
+            justify-content: space-between;
+            border-top: none;
+            border-bottom: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-body-container {
+            background-color: white;
+            border-radius: 0 0 25px 25px;
+            padding: 5px 25px 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .email-body * {  /* Targets all elements within .email-body */
+            white-space: normal;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <div class="subject">
+        <%c++ $$ << getHeaderValue(message.payload.headers, "Subject");%>
+    </div>
+    <div class="email-info">
+        <div><strong>From:</strong> <%c++ $$ << getHeaderValue(message.payload.headers, "From");%></div>
+        <div><strong>To:</strong> <%c++ $$ << getHeaderValue(message.payload.headers, "To");%></div>
+        <div><strong>Date:</strong> <%c++ $$ << getHeaderValue(message.payload.headers, "Date");%></div>
+    </div>
+    <div class="email-body-container">
+        <div class="email-body">
+            <%c++ $$ << decodedBody;%>
+        </div>
+    </div>
+
+</body>
+
+</html>
