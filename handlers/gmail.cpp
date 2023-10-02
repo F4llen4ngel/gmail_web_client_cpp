@@ -13,6 +13,11 @@ typedef std::function<void(const drogon::HttpResponsePtr &)> Callback;
 
 gmail_client client = gmail_client();
 
+/**
+ * @brief OAuth redirect handler for Gmail API
+ * @param request - request with code parameter
+ * @param callback - callback function
+ */
 void oauthRedirectHandler(const drogon::HttpRequestPtr &request, Callback&& callback) {
     Json::Value jsonBody;
     auto code = request->getParameter("code");
@@ -28,6 +33,11 @@ void oauthRedirectHandler(const drogon::HttpRequestPtr &request, Callback&& call
     }
 }
 
+/**
+ * @brief Login page handler
+ * @param request - request with code parameter
+ * @param callback - callback function
+ */
 void loginPageHandler(const drogon::HttpRequestPtr &request, Callback&& callback) {
     drogon::HttpViewData data;
 
@@ -38,6 +48,11 @@ void loginPageHandler(const drogon::HttpRequestPtr &request, Callback&& callback
     callback(resp);
 }
 
+/**
+ * @brief Index page handler
+ * @param request - request with code parameter
+ * @param callback - callback function
+ */
 void rootHandler(const drogon::HttpRequestPtr &request, Callback&& callback) {
     std::string accessToken = request->getCookie("access_token");
 
@@ -50,6 +65,11 @@ void rootHandler(const drogon::HttpRequestPtr &request, Callback&& callback) {
     client.getMessages(accessToken, std::move(callback));
 }
 
+/**
+ * @brief Message page handler
+ * @param request - request with code parameter
+ * @param callback - callback function
+ */
 void messageHandler(const drogon::HttpRequestPtr &request, Callback&& callback) {
     std::string access_token = request->getCookie("access_token");
     std::string message_id = request->getParameter("id");

@@ -154,3 +154,5 @@ config.json
 vcpkg.json
 
 .DS_Store
+
+.idea/

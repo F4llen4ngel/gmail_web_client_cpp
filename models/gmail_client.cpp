@@ -51,6 +51,11 @@ MessagePart::MessagePart() {
     parts = std::vector<MessagePart>();
 }
 
+/**
+ * @brief Construct a new Message object
+ * for more information about the json structure visit https://developers.google.com/gmail/api/reference/rest/v1/users.messages
+ * @param json Json::Value
+ */
 Message::Message(const Json::Value &json) {
     id = json["id"].asString();
     threadId = json["threadId"].asString();
@@ -98,6 +103,9 @@ Message::Message() {
     payload = MessagePart();
 }
 
+/**
+ * @brief Construct a new gmail_client object
+ */
 gmail_client::gmail_client() {
     client_id = std::getenv("CLIENT_ID");
     client_secret = std::getenv("CLIENT_SECRET");
@@ -125,6 +133,10 @@ gmail_client::gmail_client() {
 
 }
 
+/**
+ * @brief Get the OAuth Url object
+ * @return std::string
+ */
 std::string gmail_client::getOAuthUrl() {
     std::string baseUrl = "https://accounts.google.com/o/oauth2/v2/auth";
     std::string scope = "https://www.googleapis.com/auth/gmail.readonly";
@@ -137,6 +149,11 @@ std::string gmail_client::getOAuthUrl() {
     return url;
 }
 
+/**
+ * @brief Get the Access Token object from google api using the code from the oauth2 callback
+ * @param code The code from the oauth2 callback
+ * @param callback The callback function to be called when the request is done
+ */
 void gmail_client::getAccessToken(const std::string &code, Callback &&callback) {
     auto req = drogon::HttpRequest::newHttpRequest();
     req->setMethod(drogon::Post);
@@ -169,6 +186,11 @@ void gmail_client::getAccessToken(const std::string &code, Callback &&callback) 
     );
 }
 
+/**
+ * @brief Get list of messages from the user's inbox
+ * @param accessToken The access token from the oauth2 callback
+ * @param callback The callback function to be called when the request is done
+ */
 void gmail_client::getMessages(const std::string &accessToken, Callback &&callback) {
     auto request = drogon::HttpRequest::newHttpRequest();
     request->setMethod(drogon::Get);
@@ -189,8 +211,6 @@ void gmail_client::getMessages(const std::string &accessToken, Callback &&callba
 
     listMessagesFuture.wait();
 
-    LOG_DEBUG << "listMessagesFuture.get()";
-
     try {
         listMessagesFuture.get();
     } catch (std::exception &e) {
@@ -201,19 +221,20 @@ void gmail_client::getMessages(const std::string &accessToken, Callback &&callba
         return;
     }
 
-    // DEBUG print
-    for (auto &message: messages) {
-        LOG_DEBUG << "Message Id: " << message.id << " from " << getHeaderValue(message.payload.headers, "From")
-                  << " with subject " << getHeaderValue(message.payload.headers, "Subject")
-                  << " and date " << getHeaderValue(message.payload.headers, "Date");
-    }
-
     drogon::HttpViewData data;
     data.insert("messages", messages);
     auto resp = drogon::HttpResponse::newHttpViewResponse("gmail.csp", data);
     callback(resp);
 }
 
+/**
+ * @brief Handle the response from the message.list request and get details for each message
+ * @param result The result of the request
+ * @param response The response from the request
+ * @param accessToken The access token from the oauth2 callback
+ * @param messages The vector of messages to be filled
+ * @param listMessagesPromise The promise to be set when the request is done
+ */
 void gmail_client::listMessagesCallback(const drogon::ReqResult &result, const drogon::HttpResponsePtr &response,
                                         const std::string &accessToken, std::vector<Message> &messages,
                                         std::promise<void> &listMessagesPromise) {
@@ -239,7 +260,7 @@ void gmail_client::listMessagesCallback(const drogon::ReqResult &result, const d
         request->setPath("/gmail/v1/users/me/messages/" + id);
         request->addHeader("Authorization", "Bearer " + accessToken);
 
-        LOG_DEBUG << "Sending request for message " << id << " in thread " << threadId << " ...";
+        LOG_DEBUG << "Sending request for message with id: " << id;
 
         gmailApiClient->sendRequest(request,
                                     [this, &messages, &listMessagesPromise, &msgCounter, &msgCount](
@@ -247,7 +268,6 @@ void gmail_client::listMessagesCallback(const drogon::ReqResult &result, const d
                                             const drogon::HttpResponsePtr &response) {
 
                                         std::string messageId = (*response->getJsonObject())["id"].asString();
-                                        LOG_DEBUG << "Message callback is called for message " << messageId;
 
                                         if (result != drogon::ReqResult::Ok) {
                                             LOG_ERROR << "Error: " << result;
@@ -261,11 +281,7 @@ void gmail_client::listMessagesCallback(const drogon::ReqResult &result, const d
 
                                         msgCounter++;
 
-                                        LOG_DEBUG << "msgCounter = " << msgCounter << " messageJson.size() = "
-                                                  << msgCount;
-
                                         if (msgCounter >= msgCount) {
-                                            LOG_DEBUG << "msgCounter == messageJson.size()";
                                             listMessagesPromise.set_value();
                                         }
                                     }
@@ -273,17 +289,11 @@ void gmail_client::listMessagesCallback(const drogon::ReqResult &result, const d
     }
 }
 
-
-std::string gmail_client::getHeaderValue(const std::vector<Header> &headers, const std::string &name) {
-    for (auto &header: headers) {
-        if (header.name == name) {
-            return header.value;
-        }
-    }
-
-    return "";
-}
-
+/*
+ * @brief Get the body of a message
+ * @param message The message to get the body from
+ * @return The body of the message
+ */
 std::string gmail_client::getBody(const Message &message) {
     if (message.payload.body.size > 0) {
         return drogon::utils::base64Decode(message.payload.body.data);
@@ -305,13 +315,18 @@ std::string gmail_client::getBody(const Message &message) {
     return "";
 }
 
+/*
+ * @brief Get message by id
+ * @param accessToken The access token from the oauth2 callback
+ * @param messageId The id of the message to get
+ * @param callback The callback function to be called when the request is done
+ * @return Mesage object
+ */
 void gmail_client::getMessageContent(const std::string &accessToken, const std::string &messageId, Callback &&callback) {
     auto request = drogon::HttpRequest::newHttpRequest();
     request->setMethod(drogon::Get);
     request->setPath("/gmail/v1/users/me/messages/" + messageId);
     request->addHeader("Authorization", "Bearer " + accessToken);
-
-    LOG_DEBUG << "Sending request for message " << messageId << " ...";
 
     Message *message;
     std::promise<void> messagePromise;
@@ -337,8 +352,6 @@ void gmail_client::getMessageContent(const std::string &accessToken, const std::
 
     messageFuture.wait();
 
-    LOG_DEBUG << "messageFuture.get()";
-
     try {
         messageFuture.get();
     } catch (std::exception &e) {
@@ -348,9 +361,6 @@ void gmail_client::getMessageContent(const std::string &accessToken, const std::
         callback(resp);
         return;
     }
-
-    LOG_DEBUG << "Message body: " << drogon::utils::base64Decode(message->payload.body.data);
-    LOG_DEBUG << "Message size: " << message->payload.body.size;
 
     drogon::HttpViewData data;
     std::string msgBody = getBody(*message);
